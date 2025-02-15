@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Chat</title>
+    <title>Real-time Chat</title>
     <style>
         * {
             margin: 0;
@@ -38,12 +38,6 @@
             max-width: 400px;
         }
 
-        .login-box h2 {
-            margin-bottom: 20px;
-            color: #1a1a1a;
-            text-align: center;
-        }
-
         .header {
             background: white;
             padding: 15px;
@@ -61,6 +55,22 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+
+        .status-connected {
+            background-color: #4CAF50;
+        }
+
+        .status-disconnected {
+            background-color: #f44336;
         }
 
         .chat-container {
@@ -131,10 +141,6 @@
             flex-grow: 1;
         }
 
-        input:focus {
-            border-color: #0084ff;
-        }
-
         button {
             background: #0084ff;
             color: white;
@@ -167,7 +173,7 @@
 <body>
     <div id="loginContainer" class="login-container">
         <div class="login-box">
-            <h2>Enter Chat</h2>
+            <h2 style="margin-bottom: 20px; text-align: center;">Enter Chat</h2>
             <div class="input-box">
                 <input 
                     type="text" 
@@ -183,8 +189,11 @@
     <div id="chatInterface" style="display: none;">
         <div class="header">
             <div class="header-content">
-                <h2>Simple Chat</h2>
-                <span id="userDisplay"></span>
+                <h2>Real-time Chat</h2>
+                <div>
+                    <span id="connectionStatus" class="status-indicator status-disconnected"></span>
+                    <span id="userDisplay"></span>
+                </div>
             </div>
         </div>
 
@@ -203,10 +212,9 @@
     </div>
 
     <script>
-        // Initialize variables
         let username = '';
-        let messages = JSON.parse(localStorage.getItem('messages')) || [];
-
+        let ws;
+        
         // Get DOM elements
         const loginContainer = document.getElementById('loginContainer');
         const chatInterface = document.getElementById('chatInterface');
@@ -216,19 +224,37 @@
         const sendButton = document.getElementById('sendButton');
         const chatContainer = document.getElementById('chatContainer');
         const userDisplay = document.getElementById('userDisplay');
+        const connectionStatus = document.getElementById('connectionStatus');
 
-        // Load and display existing messages
-        function displayMessages() {
-            chatContainer.innerHTML = '';
-            messages.forEach(message => {
-                const messageElement = createMessageElement(message);
-                chatContainer.appendChild(messageElement);
-            });
-            scrollToBottom();
+        function connectWebSocket() {
+            // Use wss:// for secure connections, ws:// for local development
+            const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+            const wsUrl = protocol + window.location.host;
+            
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                connectionStatus.classList.remove('status-disconnected');
+                connectionStatus.classList.add('status-connected');
+                sendButton.disabled = false;
+            };
+
+            ws.onclose = () => {
+                connectionStatus.classList.remove('status-connected');
+                connectionStatus.classList.add('status-disconnected');
+                sendButton.disabled = true;
+                
+                // Try to reconnect after 5 seconds
+                setTimeout(connectWebSocket, 5000);
+            };
+
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                displayMessage(message);
+            };
         }
 
-        // Create message element
-        function createMessageElement(message) {
+        function displayMessage(message) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${message.sender === username ? 'sent' : 'received'}`;
             
@@ -251,46 +277,38 @@
             messageDiv.appendChild(messageContent);
             messageDiv.appendChild(messageInfo);
             
-            return messageDiv;
+            chatContainer.appendChild(messageDiv);
+            scrollToBottom();
         }
 
-        // Handle joining chat
+        function scrollToBottom() {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function sendMessage() {
+            const messageText = messageInput.value.trim();
+            if (messageText && ws.readyState === WebSocket.OPEN) {
+                const message = {
+                    sender: username,
+                    text: messageText,
+                    timestamp: new Date().toLocaleTimeString()
+                };
+                ws.send(JSON.stringify(message));
+                messageInput.value = '';
+            }
+        }
+
+        // Event listeners
         joinButton.addEventListener('click', () => {
             username = usernameInput.value.trim();
             if (username) {
                 loginContainer.style.display = 'none';
                 chatInterface.style.display = 'block';
                 userDisplay.textContent = `Logged in as: ${username}`;
-                displayMessages();
+                connectWebSocket();
             }
         });
 
-        // Handle sending messages
-        function sendMessage() {
-            const messageText = messageInput.value.trim();
-            if (messageText) {
-                const message = {
-                    sender: username,
-                    text: messageText,
-                    timestamp: new Date().toLocaleTimeString()
-                };
-                messages.push(message);
-                localStorage.setItem('messages', JSON.stringify(messages));
-                
-                const messageElement = createMessageElement(message);
-                chatContainer.appendChild(messageElement);
-                
-                messageInput.value = '';
-                scrollToBottom();
-            }
-        }
-
-        // Scroll to bottom of chat
-        function scrollToBottom() {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        // Event listeners
         sendButton.addEventListener('click', sendMessage);
         
         messageInput.addEventListener('keypress', (e) => {
@@ -304,9 +322,6 @@
                 joinButton.click();
             }
         });
-
-        // Initial display
-        displayMessages();
     </script>
 </body>
 </html>
