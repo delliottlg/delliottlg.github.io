@@ -1,1 +1,312 @@
-test
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background: #f0f2f5;
+        }
+
+        .login-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #f0f2f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-box {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-box h2 {
+            margin-bottom: 20px;
+            color: #1a1a1a;
+            text-align: center;
+        }
+
+        .header {
+            background: white;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-container {
+            max-width: 800px;
+            margin: 80px auto 100px;
+            padding: 20px;
+        }
+
+        .message {
+            margin: 10px 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message.sent {
+            align-items: flex-end;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 10px 15px;
+            border-radius: 15px;
+            margin: 2px 0;
+            word-wrap: break-word;
+        }
+
+        .received .message-content {
+            background: white;
+            color: black;
+        }
+
+        .sent .message-content {
+            background: #0084ff;
+            color: white;
+        }
+
+        .message-info {
+            font-size: 0.75rem;
+            color: #65676b;
+            margin: 0 5px;
+        }
+
+        .input-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 15px;
+            box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .input-box {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            gap: 10px;
+        }
+
+        input, button {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            outline: none;
+        }
+
+        input {
+            flex-grow: 1;
+        }
+
+        input:focus {
+            border-color: #0084ff;
+        }
+
+        button {
+            background: #0084ff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            min-width: 100px;
+        }
+
+        button:hover {
+            background: #0073e6;
+        }
+
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .username {
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        @media (max-width: 600px) {
+            .message-content {
+                max-width: 85%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="loginContainer" class="login-container">
+        <div class="login-box">
+            <h2>Enter Chat</h2>
+            <div class="input-box">
+                <input 
+                    type="text" 
+                    id="usernameInput" 
+                    placeholder="Enter your name"
+                    style="width: 100%; margin-bottom: 10px;"
+                >
+                <button id="joinButton" style="width: 100%;">Join Chat</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="chatInterface" style="display: none;">
+        <div class="header">
+            <div class="header-content">
+                <h2>Simple Chat</h2>
+                <span id="userDisplay"></span>
+            </div>
+        </div>
+
+        <div class="chat-container" id="chatContainer"></div>
+
+        <div class="input-container">
+            <div class="input-box">
+                <input 
+                    type="text" 
+                    id="messageInput" 
+                    placeholder="Type a message..."
+                >
+                <button id="sendButton">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize variables
+        let username = '';
+        let messages = JSON.parse(localStorage.getItem('messages')) || [];
+
+        // Get DOM elements
+        const loginContainer = document.getElementById('loginContainer');
+        const chatInterface = document.getElementById('chatInterface');
+        const usernameInput = document.getElementById('usernameInput');
+        const joinButton = document.getElementById('joinButton');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const chatContainer = document.getElementById('chatContainer');
+        const userDisplay = document.getElementById('userDisplay');
+
+        // Load and display existing messages
+        function displayMessages() {
+            chatContainer.innerHTML = '';
+            messages.forEach(message => {
+                const messageElement = createMessageElement(message);
+                chatContainer.appendChild(messageElement);
+            });
+            scrollToBottom();
+        }
+
+        // Create message element
+        function createMessageElement(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${message.sender === username ? 'sent' : 'received'}`;
+            
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            
+            const senderName = document.createElement('div');
+            senderName.className = 'username';
+            senderName.textContent = message.sender === username ? 'You' : message.sender;
+            
+            const messageText = document.createElement('div');
+            messageText.textContent = message.text;
+            
+            const messageInfo = document.createElement('div');
+            messageInfo.className = 'message-info';
+            messageInfo.textContent = message.timestamp;
+            
+            messageContent.appendChild(senderName);
+            messageContent.appendChild(messageText);
+            messageDiv.appendChild(messageContent);
+            messageDiv.appendChild(messageInfo);
+            
+            return messageDiv;
+        }
+
+        // Handle joining chat
+        joinButton.addEventListener('click', () => {
+            username = usernameInput.value.trim();
+            if (username) {
+                loginContainer.style.display = 'none';
+                chatInterface.style.display = 'block';
+                userDisplay.textContent = `Logged in as: ${username}`;
+                displayMessages();
+            }
+        });
+
+        // Handle sending messages
+        function sendMessage() {
+            const messageText = messageInput.value.trim();
+            if (messageText) {
+                const message = {
+                    sender: username,
+                    text: messageText,
+                    timestamp: new Date().toLocaleTimeString()
+                };
+                messages.push(message);
+                localStorage.setItem('messages', JSON.stringify(messages));
+                
+                const messageElement = createMessageElement(message);
+                chatContainer.appendChild(messageElement);
+                
+                messageInput.value = '';
+                scrollToBottom();
+            }
+        }
+
+        // Scroll to bottom of chat
+        function scrollToBottom() {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        usernameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                joinButton.click();
+            }
+        });
+
+        // Initial display
+        displayMessages();
+    </script>
+</body>
+</html>
